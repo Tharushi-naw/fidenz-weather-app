@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const express = require("express");
 const citiesData = require("./data/cities.json");
 
@@ -23,6 +25,26 @@ app.get("/api/cities", (req, res) => {
         count: cities.length,
         cityCodes: cityCodes
     });
+});
+
+app.get("/api/weather/test", async (req, res) => {
+    try {
+        const apiKey = process.env.OPENWEATHER_API_KEY;
+        const cityCode = cityCodes[0];
+
+        const url =
+            `https://api.openweathermap.org/data/2.5/weather?id=${cityCode}&appid=${apiKey}&units=metric`;
+
+        const response = await fetch(url);
+
+        const weatherData = await response.json();
+
+        res.json(weatherData);
+    } catch (error) {
+        res.status(500).json({
+            message: "Failed to fetch weather data"
+        });
+    }
 });
 
 app.listen(PORT, () => {
