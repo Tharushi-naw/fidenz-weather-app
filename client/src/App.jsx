@@ -1,14 +1,30 @@
 import { useEffect, useState } from "react";
+import { useAuth0 } from "@auth0/auth0-react";
 import "./App.css";
 
 function App() {
+    const {
+        isAuthenticated,
+        isLoading: authLoading,
+        loginWithRedirect,
+        logout,
+        user
+    } = useAuth0();
+
     const [cities, setCities] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
     useEffect(() => {
+        if (!isAuthenticated) {
+            return;
+        }
+
         async function loadWeather() {
             try {
+                setLoading(true);
+                setError("");
+
                 const response = await fetch(
                     "http://localhost:5000/api/weather"
                 );
@@ -30,7 +46,42 @@ function App() {
         }
 
         loadWeather();
-    }, []);
+    }, [isAuthenticated]);
+
+    if (authLoading) {
+        return (
+            <main className="page">
+                <p className="status-message">
+                    Checking authentication...
+                </p>
+            </main>
+        );
+    }
+
+    if (!isAuthenticated) {
+        return (
+            <main className="login-page">
+                <section className="login-card">
+                    <p className="eyebrow">
+                        Weather Analytics
+                    </p>
+
+                    <h1>Comfort Index Dashboard</h1>
+
+                    <p className="login-description">
+                        Sign in to access the weather comfort rankings.
+                    </p>
+
+                    <button
+                        className="login-button"
+                        onClick={() => loginWithRedirect()}
+                    >
+                        Log in
+                    </button>
+                </section>
+            </main>
+        );
+    }
 
     if (loading) {
         return (
@@ -55,16 +106,43 @@ function App() {
     return (
         <main className="page">
             <header className="dashboard-header">
-                <p className="eyebrow">
-                    Weather Analytics
-                </p>
+                <div className="header-content">
+                    <div>
+                        <p className="eyebrow">
+                            Weather Analytics
+                        </p>
 
-                <h1>Comfort Index Dashboard</h1>
+                        <h1>Comfort Index Dashboard</h1>
 
-                <p className="subtitle">
-                    Cities ranked from most comfortable to least
-                    comfortable using current weather conditions.
-                </p>
+                        <p className="subtitle">
+                            Cities ranked from most comfortable
+                            to least comfortable using current
+                            weather conditions.
+                        </p>
+                    </div>
+
+                    <div className="user-actions">
+                        {user?.email && (
+                            <span className="user-email">
+                                {user.email}
+                            </span>
+                        )}
+
+                        <button
+                            className="logout-button"
+                            onClick={() =>
+                                logout({
+                                    logoutParams: {
+                                        returnTo:
+                                            window.location.origin
+                                    }
+                                })
+                            }
+                        >
+                            Log out
+                        </button>
+                    </div>
+                </div>
             </header>
 
             <section className="weather-grid">
@@ -96,7 +174,9 @@ function App() {
                         <div className="weather-details">
                             <div>
                                 <span>Humidity</span>
-                                <strong>{city.humidity}%</strong>
+                                <strong>
+                                    {city.humidity}%
+                                </strong>
                             </div>
 
                             <div>
@@ -109,7 +189,9 @@ function App() {
 
                         <div className="comfort-section">
                             <div className="comfort-heading">
-                                <span>Comfort Index</span>
+                                <span>
+                                    Comfort Index
+                                </span>
 
                                 <strong>
                                     {city.comfortScore}
@@ -120,7 +202,8 @@ function App() {
                                 <div
                                     className="comfort-fill"
                                     style={{
-                                        width: `${city.comfortScore}%`
+                                        width:
+                                            `${city.comfortScore}%`
                                     }}
                                 />
                             </div>
