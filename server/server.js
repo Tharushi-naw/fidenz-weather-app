@@ -28,6 +28,20 @@ async function fetchWeather(cityCode) {
     return weatherData;
 }
 
+function formatWeatherData(weatherData) {
+    return {
+        cityCode: weatherData.id,
+        cityName: weatherData.name,
+        description: weatherData.weather[0].description,
+        temperature: weatherData.main.temp,
+        humidity: weatherData.main.humidity,
+        windSpeed: weatherData.wind.speed,
+        pressure: weatherData.main.pressure,
+        visibility: weatherData.visibility,
+        cloudiness: weatherData.clouds.all
+    };
+}
+
 app.get("/", (req, res) => {
     res.send("Fidenz Weather API is running");
 });
@@ -68,9 +82,13 @@ app.get("/api/weather", async (req, res) => {
 
         const weatherResults = await Promise.all(weatherPromises);
 
+        const formattedWeather = weatherResults.map(weatherData => {
+            return formatWeatherData(weatherData);
+        });
+
         res.json({
-            count: weatherResults.length,
-            cities: weatherResults
+            count: formattedWeather.length,
+            cities: formattedWeather
         });
     } catch (error) {
         console.error(error);
