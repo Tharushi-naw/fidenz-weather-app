@@ -1,9 +1,16 @@
 require("dotenv").config();
 
 const express = require("express");
+const cors = require("cors");
 const citiesData = require("./data/cities.json");
 
 const app = express();
+
+app.use(
+    cors({
+        origin: "http://localhost:5173"
+    })
+);
 
 const PORT = 5000;
 
