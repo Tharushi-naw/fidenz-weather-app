@@ -8,7 +8,8 @@ function App() {
         isLoading: authLoading,
         loginWithRedirect,
         logout,
-        user
+        user,
+        getAccessTokenSilently
     } = useAuth0();
 
     const [cities, setCities] = useState([]);
@@ -17,6 +18,9 @@ function App() {
 
     useEffect(() => {
         if (!isAuthenticated) {
+            setCities([]);
+            setLoading(false);
+            setError("");
             return;
         }
 
@@ -25,29 +29,43 @@ function App() {
                 setLoading(true);
                 setError("");
 
+                // Get a valid Auth0 access token
+                const accessToken = await getAccessTokenSilently();
+
+                // Send the access token to the protected Express API
                 const response = await fetch(
-                    "http://localhost:5000/api/weather"
+                    "http://localhost:5000/api/weather",
+                    {
+                        headers: {
+                            Authorization: `Bearer ${accessToken}`
+                        }
+                    }
                 );
 
                 if (!response.ok) {
-                    throw new Error("Unable to load weather data");
+                    throw new Error(
+                        `Unable to load weather data. Status: ${response.status}`
+                    );
                 }
 
                 const data = await response.json();
 
                 setCities(data.cities);
             } catch (error) {
-                console.error(error);
+                console.error("Weather request failed:", error);
 
-                setError("Unable to load weather information.");
+                setError(
+                    "Unable to load weather information."
+                );
             } finally {
                 setLoading(false);
             }
         }
 
         loadWeather();
-    }, [isAuthenticated]);
+    }, [isAuthenticated, getAccessTokenSilently]);
 
+    // Auth0 is still checking whether the user is logged in
     if (authLoading) {
         return (
             <main className="page">
@@ -58,6 +76,7 @@ function App() {
         );
     }
 
+    // User is not logged in
     if (!isAuthenticated) {
         return (
             <main className="login-page">
@@ -66,15 +85,20 @@ function App() {
                         Weather Analytics
                     </p>
 
-                    <h1>Comfort Index Dashboard</h1>
+                    <h1>
+                        Comfort Index Dashboard
+                    </h1>
 
                     <p className="login-description">
-                        Sign in to access the weather comfort rankings.
+                        Sign in to access the weather comfort
+                        rankings.
                     </p>
 
                     <button
                         className="login-button"
-                        onClick={() => loginWithRedirect()}
+                        onClick={() =>
+                            loginWithRedirect()
+                        }
                     >
                         Log in
                     </button>
@@ -83,6 +107,7 @@ function App() {
         );
     }
 
+    // User is logged in, but weather is loading
     if (loading) {
         return (
             <main className="page">
@@ -93,6 +118,7 @@ function App() {
         );
     }
 
+    // Weather request failed
     if (error) {
         return (
             <main className="page">
@@ -103,6 +129,7 @@ function App() {
         );
     }
 
+    // Logged-in dashboard
     return (
         <main className="page">
             <header className="dashboard-header">
@@ -112,7 +139,9 @@ function App() {
                             Weather Analytics
                         </p>
 
-                        <h1>Comfort Index Dashboard</h1>
+                        <h1>
+                            Comfort Index Dashboard
+                        </h1>
 
                         <p className="subtitle">
                             Cities ranked from most comfortable
@@ -161,7 +190,9 @@ function App() {
                             </span>
                         </div>
 
-                        <h2>{city.cityName}</h2>
+                        <h2>
+                            {city.cityName}
+                        </h2>
 
                         <p className="description">
                             {city.description}
@@ -173,14 +204,20 @@ function App() {
 
                         <div className="weather-details">
                             <div>
-                                <span>Humidity</span>
+                                <span>
+                                    Humidity
+                                </span>
+
                                 <strong>
                                     {city.humidity}%
                                 </strong>
                             </div>
 
                             <div>
-                                <span>Wind</span>
+                                <span>
+                                    Wind
+                                </span>
+
                                 <strong>
                                     {city.windSpeed} m/s
                                 </strong>

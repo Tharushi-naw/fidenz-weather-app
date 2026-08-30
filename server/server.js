@@ -2,9 +2,12 @@ require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
+const { auth } = require("express-oauth2-jwt-bearer");
 const citiesData = require("./data/cities.json");
 
 const app = express();
+
+const PORT = 5000;
 
 app.use(
     cors({
@@ -12,7 +15,12 @@ app.use(
     })
 );
 
-const PORT = 5000;
+app.use(express.json());
+
+const validateAccessToken = auth({
+    issuerBaseURL: `https://${process.env.AUTH0_DOMAIN}`,
+    audience: process.env.AUTH0_AUDIENCE
+});
 
 const cities = citiesData.List;
 
@@ -23,6 +31,7 @@ const CACHE_TTL = 5 * 60 * 1000;
 const weatherCache = new Map();
 
 const cacheAccessStatus = new Map();
+
 
 async function fetchWeather(cityCode) {
     const cacheKey = String(cityCode);
@@ -50,8 +59,11 @@ async function fetchWeather(cityCode) {
 
     const apiKey = process.env.OPENWEATHER_API_KEY;
 
+
     if (!apiKey) {
-        throw new Error("OPENWEATHER_API_KEY is missing");
+        throw new Error(
+            "OPENWEATHER_API_KEY is missing"
+        );
     }
 
 
@@ -81,8 +93,12 @@ async function fetchWeather(cityCode) {
 }
 
 function clampScore(score) {
-    return Math.max(0, Math.min(100, score));
+    return Math.max(
+        0,
+        Math.min(100, score)
+    );
 }
+
 
 function calculateComfortIndex(
     temperature,
@@ -93,16 +109,13 @@ function calculateComfortIndex(
         100 - Math.abs(temperature - 22) * 5
     );
 
-
     const humidityScore = clampScore(
         100 - Math.abs(humidity - 50) * 2
     );
 
-
     const windScore = clampScore(
         100 - Math.abs(windSpeed - 2) * 10
     );
-
 
     const comfortScore =
         temperatureScore * 0.5 +
@@ -114,36 +127,55 @@ function calculateComfortIndex(
 }
 
 function formatWeatherData(weatherData) {
-    const temperature = weatherData.main.temp;
+    const temperature =
+        weatherData.main.temp;
 
-    const humidity = weatherData.main.humidity;
+    const humidity =
+        weatherData.main.humidity;
 
-    const windSpeed = weatherData.wind.speed;
+    const windSpeed =
+        weatherData.wind.speed;
 
 
-    const comfortScore = calculateComfortIndex(
-        temperature,
-        humidity,
-        windSpeed
-    );
+    const comfortScore =
+        calculateComfortIndex(
+            temperature,
+            humidity,
+            windSpeed
+        );
 
 
     return {
         cityCode: weatherData.id,
+
         cityName: weatherData.name,
-        description: weatherData.weather[0].description,
+
+        description:
+            weatherData.weather[0].description,
+
         temperature: temperature,
+
         humidity: humidity,
+
         windSpeed: windSpeed,
-        pressure: weatherData.main.pressure,
-        visibility: weatherData.visibility,
-        cloudiness: weatherData.clouds.all,
+
+        pressure:
+            weatherData.main.pressure,
+
+        visibility:
+            weatherData.visibility,
+
+        cloudiness:
+            weatherData.clouds.all,
+
         comfortScore: comfortScore
     };
 }
 
 app.get("/", (req, res) => {
-    res.send("Fidenz Weather API is running");
+    res.send(
+        "Fidenz Weather API is running"
+    );
 });
 
 app.get("/api/status", (req, res) => {
@@ -153,6 +185,8 @@ app.get("/api/status", (req, res) => {
     });
 });
 
+app.use("/api", validateAccessToken);
+
 app.get("/api/cities", (req, res) => {
     res.json({
         count: cities.length,
@@ -160,133 +194,222 @@ app.get("/api/cities", (req, res) => {
     });
 });
 
-app.get("/api/weather/test", async (req, res) => {
-    try {
-        const cityCode = cityCodes[0];
+app.get(
+    "/api/weather/test",
+    async (req, res) => {
+        try {
+            const cityCode =
+                cityCodes[0];
 
-        const weatherData = await fetchWeather(cityCode);
 
-        res.json(weatherData);
-    } catch (error) {
-        console.error(error);
+            const weatherData =
+                await fetchWeather(
+                    cityCode
+                );
 
-        res.status(500).json({
-            message: "Failed to fetch weather data"
-        });
+
+            res.json(weatherData);
+
+        } catch (error) {
+            console.error(error);
+
+
+            res.status(500).json({
+                message:
+                    "Failed to fetch weather data"
+            });
+        }
     }
-});
+);
+
+app.get(
+    "/api/weather",
+    async (req, res) => {
+        try {
+            const weatherPromises =
+                cityCodes.map(
+                    cityCode => {
+                        return fetchWeather(
+                            cityCode
+                        );
+                    }
+                );
+
+            const weatherResults =
+                await Promise.all(
+                    weatherPromises
+                );
+
+            const formattedWeather =
+                weatherResults.map(
+                    weatherData => {
+                        return formatWeatherData(
+                            weatherData
+                        );
+                    }
+                );
+
+            const sortedWeather =
+                formattedWeather.sort(
+                    (a, b) => {
+                        return (
+                            b.comfortScore -
+                            a.comfortScore
+                        );
+                    }
+                );
+
+            const rankedWeather =
+                sortedWeather.map(
+                    (city, index) => {
+                        return {
+                            ...city,
+                            rank: index + 1
+                        };
+                    }
+                );
 
 
-app.get("/api/weather", async (req, res) => {
-    try {
-        const weatherPromises = cityCodes.map(cityCode => {
-            return fetchWeather(cityCode);
-        });
+            res.json({
+                count:
+                    rankedWeather.length,
+
+                cities:
+                    rankedWeather
+            });
+
+        } catch (error) {
+            console.error(error);
 
 
-        const weatherResults =
-            await Promise.all(weatherPromises);
+            res.status(500).json({
+                message:
+                    "Failed to fetch weather data"
+            });
+        }
+    }
+);
+
+app.get(
+    "/api/cache/status",
+    (req, res) => {
+        const currentTime =
+            Date.now();
 
 
-        const formattedWeather = weatherResults.map(
-            weatherData => {
-                return formatWeatherData(weatherData);
-            }
-        );
+        const cacheStatus =
+            cities.map(city => {
+                const cacheKey =
+                    String(
+                        city.CityCode
+                    );
 
 
-        const sortedWeather = formattedWeather.sort(
-            (a, b) => {
-                return b.comfortScore - a.comfortScore;
-            }
-        );
+                const cachedItem =
+                    weatherCache.get(
+                        cacheKey
+                    );
 
 
-        const rankedWeather = sortedWeather.map(
-            (city, index) => {
+                let currentCacheState =
+                    "MISS";
+
+                let ageSeconds =
+                    null;
+
+                let expiresInSeconds =
+                    0;
+
+
+                if (cachedItem) {
+                    const age =
+                        currentTime -
+                        cachedItem.timestamp;
+
+
+                    if (
+                        age <
+                        CACHE_TTL
+                    ) {
+                        currentCacheState =
+                            "HIT";
+
+
+                        ageSeconds =
+                            Math.floor(
+                                age /
+                                1000
+                            );
+
+
+                        expiresInSeconds =
+                            Math.ceil(
+                                (
+                                    CACHE_TTL -
+                                    age
+                                ) /
+                                1000
+                            );
+                    }
+                }
+
+
                 return {
-                    ...city,
-                    rank: index + 1
+                    cityCode:
+                        city.CityCode,
+
+                    cityName:
+                        city.CityName,
+
+                    lastRequestStatus:
+                        cacheAccessStatus.get(
+                            cacheKey
+                        ) ||
+                        "MISS",
+
+                    currentCacheState:
+                        currentCacheState,
+
+                    ageSeconds:
+                        ageSeconds,
+
+                    expiresInSeconds:
+                        expiresInSeconds
                 };
-            }
-        );
+            });
 
 
         res.json({
-            count: rankedWeather.length,
-            cities: rankedWeather
-        });
+            ttlSeconds:
+                CACHE_TTL / 1000,
 
-    } catch (error) {
-        console.error(error);
-
-        res.status(500).json({
-            message: "Failed to fetch weather data"
+            cities:
+                cacheStatus
         });
     }
-});
+);
 
-app.get("/api/cache/status", (req, res) => {
-    const currentTime = Date.now();
-
-
-    const cacheStatus = cities.map(city => {
-        const cacheKey = String(city.CityCode);
-
-        const cachedItem = weatherCache.get(cacheKey);
-
-
-        let currentCacheState = "MISS";
-
-        let ageSeconds = null;
-
-        let expiresInSeconds = 0;
-
-
-        if (cachedItem) {
-            const age =
-                currentTime - cachedItem.timestamp;
-
-
-            if (age < CACHE_TTL) {
-                currentCacheState = "HIT";
-
-                ageSeconds =
-                    Math.floor(age / 1000);
-
-                expiresInSeconds =
-                    Math.ceil(
-                        (CACHE_TTL - age) / 1000
-                    );
-            }
+app.use(
+    (error, req, res, next) => {
+        if (error.status === 401) {
+            return res.status(401).json({
+                message:
+                    "Unauthorized. A valid access token is required."
+            });
         }
 
 
-        return {
-            cityCode: city.CityCode,
-            cityName: city.CityName,
-
-            lastRequestStatus:
-                cacheAccessStatus.get(cacheKey) || "MISS",
-
-            currentCacheState:
-                currentCacheState,
-
-            ageSeconds:
-                ageSeconds,
-
-            expiresInSeconds:
-                expiresInSeconds
-        };
-    });
+        console.error(error);
 
 
-    res.json({
-        ttlSeconds: CACHE_TTL / 1000,
-        cities: cacheStatus
-    });
-});
-
+        res.status(
+            error.status || 500
+        ).json({
+            message:
+                "Internal server error"
+        });
+    }
+);
 
 app.listen(PORT, () => {
     console.log(
