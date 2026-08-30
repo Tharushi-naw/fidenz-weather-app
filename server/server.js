@@ -9,6 +9,8 @@ const PORT = 5000;
 const cities = citiesData.List;
 const cityCodes = cities.map(city => city.CityCode);
 
+
+// Fetch weather data for one city from OpenWeatherMap
 async function fetchWeather(cityCode) {
     const apiKey = process.env.OPENWEATHER_API_KEY;
 
@@ -28,23 +30,66 @@ async function fetchWeather(cityCode) {
     return weatherData;
 }
 
+
+// score between 0 and 100
+function clampScore(score) {
+    return Math.max(0, Math.min(100, score));
+}
+
+
+function calculateComfortIndex(temperature, humidity, windSpeed) {
+    const temperatureScore = clampScore(
+        100 - Math.abs(temperature - 22) * 5
+    );
+
+    const humidityScore = clampScore(
+        100 - Math.abs(humidity - 50) * 2
+    );
+
+    const windScore = clampScore(
+        100 - Math.abs(windSpeed - 2) * 10
+    );
+
+    const comfortScore =
+        temperatureScore * 0.5 +
+        humidityScore * 0.3 +
+        windScore * 0.2;
+
+    return Math.round(comfortScore);
+}
+
+
+// Convert the OpenWeather response into the data
 function formatWeatherData(weatherData) {
+    const temperature = weatherData.main.temp;
+    const humidity = weatherData.main.humidity;
+    const windSpeed = weatherData.wind.speed;
+
+    const comfortScore = calculateComfortIndex(
+        temperature,
+        humidity,
+        windSpeed
+    );
+
     return {
         cityCode: weatherData.id,
         cityName: weatherData.name,
         description: weatherData.weather[0].description,
-        temperature: weatherData.main.temp,
-        humidity: weatherData.main.humidity,
-        windSpeed: weatherData.wind.speed,
+        temperature: temperature,
+        humidity: humidity,
+        windSpeed: windSpeed,
         pressure: weatherData.main.pressure,
         visibility: weatherData.visibility,
-        cloudiness: weatherData.clouds.all
+        cloudiness: weatherData.clouds.all,
+        comfortScore: comfortScore
     };
 }
+
 
 app.get("/", (req, res) => {
     res.send("Fidenz Weather API is running");
 });
+
 
 app.get("/api/status", (req, res) => {
     res.json({
@@ -53,12 +98,14 @@ app.get("/api/status", (req, res) => {
     });
 });
 
+
 app.get("/api/cities", (req, res) => {
     res.json({
         count: cities.length,
         cityCodes: cityCodes
     });
 });
+
 
 app.get("/api/weather/test", async (req, res) => {
     try {
@@ -68,12 +115,16 @@ app.get("/api/weather/test", async (req, res) => {
 
         res.json(weatherData);
     } catch (error) {
+        console.error(error);
+
         res.status(500).json({
             message: "Failed to fetch weather data"
         });
     }
 });
 
+
+// Fetch and process weather for all cities
 app.get("/api/weather", async (req, res) => {
     try {
         const weatherPromises = cityCodes.map(cityCode => {
@@ -98,6 +149,7 @@ app.get("/api/weather", async (req, res) => {
         });
     }
 });
+
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
