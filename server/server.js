@@ -10,7 +10,7 @@ const cities = citiesData.List;
 const cityCodes = cities.map(city => city.CityCode);
 
 
-// Fetch weather data for one city from OpenWeatherMap
+// Fetch weather data for one city 
 async function fetchWeather(cityCode) {
     const apiKey = process.env.OPENWEATHER_API_KEY;
 
@@ -31,7 +31,7 @@ async function fetchWeather(cityCode) {
 }
 
 
-// score between 0 and 100
+// Score between 0 and 100
 function clampScore(score) {
     return Math.max(0, Math.min(100, score));
 }
@@ -58,8 +58,6 @@ function calculateComfortIndex(temperature, humidity, windSpeed) {
     return Math.round(comfortScore);
 }
 
-
-// Convert the OpenWeather response into the data
 function formatWeatherData(weatherData) {
     const temperature = weatherData.main.temp;
     const humidity = weatherData.main.humidity;
@@ -85,11 +83,9 @@ function formatWeatherData(weatherData) {
     };
 }
 
-
 app.get("/", (req, res) => {
     res.send("Fidenz Weather API is running");
 });
-
 
 app.get("/api/status", (req, res) => {
     res.json({
@@ -98,14 +94,12 @@ app.get("/api/status", (req, res) => {
     });
 });
 
-
 app.get("/api/cities", (req, res) => {
     res.json({
         count: cities.length,
         cityCodes: cityCodes
     });
 });
-
 
 app.get("/api/weather/test", async (req, res) => {
     try {
@@ -123,8 +117,6 @@ app.get("/api/weather/test", async (req, res) => {
     }
 });
 
-
-// Fetch and process weather for all cities
 app.get("/api/weather", async (req, res) => {
     try {
         const weatherPromises = cityCodes.map(cityCode => {
@@ -137,9 +129,20 @@ app.get("/api/weather", async (req, res) => {
             return formatWeatherData(weatherData);
         });
 
+        const sortedWeather = formattedWeather.sort((a, b) => {
+            return b.comfortScore - a.comfortScore;
+        });
+
+        const rankedWeather = sortedWeather.map((city, index) => {
+            return {
+                ...city,
+                rank: index + 1
+            };
+        });
+
         res.json({
-            count: formattedWeather.length,
-            cities: formattedWeather
+            count: rankedWeather.length,
+            cities: rankedWeather
         });
     } catch (error) {
         console.error(error);
