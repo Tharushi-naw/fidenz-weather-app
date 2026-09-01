@@ -77,3 +77,5 @@ test("less comfortable conditions produce a lower score", () => {
         uncomfortableScore
     );
 });
+
+test("better visibility produces a higher comfort score" , () => { const good = calculateComfortIndex(22,50,2,10000); const poor = calculateComfortIndex(22,50,2,2000); assert.ok(good>poor);});

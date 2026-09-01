@@ -106,12 +106,16 @@ function formatWeatherData(weatherData) {
     const windSpeed =
         weatherData.wind.speed;
 
+    const visibility =
+        weatherData.visibility;
+
 
     const comfortScore =
         calculateComfortIndex(
             temperature,
             humidity,
-            windSpeed
+            windSpeed,
+            visibility
         );
 
 
