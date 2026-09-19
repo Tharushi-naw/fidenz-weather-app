@@ -15,7 +15,7 @@ const {
 
 app.use(
     cors({
-        origin: "http://localhost:5173"
+        origin: "https://weather-app-me-8f9e.vercel.app"
     })
 );
 
@@ -385,8 +385,4 @@ app.use(
     }
 );
 
-app.listen(PORT, () => {
-    console.log(
-        `Server running on http://localhost:${PORT}`
-    );
-});
+module.exports = app;
